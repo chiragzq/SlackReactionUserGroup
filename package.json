@@ -1,0 +1,22 @@
+{
+  "name": "slack-reaction-user-group",
+  "version": "1.0.0",
+  "description": "A slack bot to allow users to add themselves to user groups by reacting to a message",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chiragzq/SlackReactionUserGroup.git"
+  },
+  "author": "Chirag Kaushik, 2019",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/chiragzq/SlackReactionUserGroup/issues"
+  },
+  "homepage": "https://github.com/chiragzq/SlackReactionUserGroup#readme",
+  "dependencies": {
+    "slackbots": "^1.2.0"
+  }
+}
