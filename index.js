@@ -14,6 +14,7 @@ let token;
 let usergroups;
 let names;
 let ids;
+let resolve;
 
 bot.on("start", async () => {
     console.log("Bot is now running");
@@ -127,20 +128,8 @@ const oauth_redirect = () => {
 }
 
 const get_oauth_code = async () => {
-    return new Promise((resolve, reject) => {
-        const server = http.createServer((req, res) => {
-            const url = urllib.parse(req.url, true);
-            if(url.pathname != "/oauth") {
-                res.writeHead(404, {"Content-Type": "text/plain"});
-                res.end("Not found");
-                reject();
-                return;
-            }
-            resolve(url.query["code"]);
-            res.writeHead(200, {"Content-Type": "text/plain"});
-            res.end("Successfully authoirzed. You may now close this page.");
-            server.close();
-        }).listen(8000);
+    return new Promise((res, reject) => {
+        resolve = res;
     });
 }
 
@@ -158,6 +147,32 @@ const fetch_user_groups = async (token) => {
         token: token
     });
 }
+
+http.createServer((req, res) => {
+    const url = urllib.parse(req.url, true);
+    if(url.pathname == "/") {
+        res.writeHead(200, {"Content-Type": "text/plain"});
+        res.end("Bot is running.")
+    }
+    else if(url.pathname == "/event" && req.method == "POST") { 
+        let body = "";
+        req.on("data", chunk => {body += chunk.toString()});
+        req.on("close", () => {
+            const data = JSON.parse(body);
+            res.writeHead(200, {"Content-Type": "text/plain"});
+            req.end(data["challenge"]);
+        });
+    }
+    else if(url.pathname == "/oauth" && resolve) {
+        resolve(url.query["code"]);
+        resolve = undefined;
+        res.writeHead(200, {"Content-Type": "text/plain"});
+        res.end("Successfully authoirzed. You may now close this page.");
+    } else {
+        res.writeHead(404, {"Content-Type": "text/plain"});
+        res.end("Not found");
+    }
+}).listen(process.env.PORT || 8000);
 
 // (async function() {
 //     const code = await get_oauth_code();
