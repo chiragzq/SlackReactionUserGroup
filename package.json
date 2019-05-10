@@ -4,7 +4,8 @@
   "description": "A slack bot to allow users to add themselves to user groups by reacting to a message",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "main": "node index.js"
   },
   "repository": {
     "type": "git",
