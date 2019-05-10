@@ -157,10 +157,10 @@ http.createServer((req, res) => {
     else if(url.pathname == "/event" && req.method == "POST") { 
         let body = "";
         req.on("data", chunk => {body += chunk.toString()});
-        req.on("close", () => {
+        req.on("end", () => {
             const data = JSON.parse(body);
             res.writeHead(200, {"Content-Type": "text/plain"});
-            req.end(data["challenge"]);
+            res.end(data["challenge"]);
         });
     }
     else if(url.pathname == "/oauth" && resolve) {
