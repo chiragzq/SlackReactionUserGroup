@@ -10,41 +10,116 @@ const bot = new SlackBot({
     name: config.name
 });
 
-let channels;
-const yes = false;
+let token;
+let usergroups;
+let names;
+let ids;
 
 bot.on("start", async () => {
     console.log("Bot is now running");
-
-    if(yes)console.log(await api("POST", "chat.postMessage", {
-        channel: "GJH7TRYTA",
-        text: `Authorize your request <${oauth_redirect()}|here>`,
-        token: config.token
-    }));
+    //send_autodelete_message("GJH7TRYTA", "This message will be deleted in 5 seconds.", 5000);
 });
-console.log(config.token);
+
+bot.on("message", async (message) => {
+    if(!message.type || message.type != "message" || message.subtype == "bot_message" || message.subtype == "message_deleted") return;
+    console.log(message);
+    if(message.text == "!rb") {
+        await send_autodelete_message(message.channel, `Allow the bot to manage user groups by clicking <${oauth_redirect()}|here>.\n\nThis message will be deleted in 1 minute.`, 1000 * 45)
+        const code = await get_oauth_code();
+        token = await exchange_oauth_code(code);
+        usergroups = (await fetch_user_groups(token)).usergroups;
+        names = usergroups.map((group) => {return group.name;});
+        ids = usergroups.map((group) => {return group.id;});
+        await send_autodelete_message(message.channel, `Success! You can now configure the reaction message with the following format:\n !rb <usergroup name>%<reaction> <usergroup name>%<reaction>...\n\nThis message will be deleted in 1 minute.`, 1000 * 45);
+    } else if(message.text.startsWith("!rb")) {
+        if(!usergroups) return;
+        try {
+            message.text = message.text.substring(4);
+            const tokens = message.text.split(" ");
+
+            let messageText = "*React to get roles associated with your subteam:*";
+            let reactions = [];
+            let bad = false;
+            tokens.some((token) => {
+                const name = token.split("%")[0];
+                const react = token.split("%")[1];
+
+                const ind = names.indexOf(name);
+                if(ind == -1) {
+                    bad = true;
+                    return true;
+                }
+                messageText += `\n${name}: ${react}`
+                reactions.push(react);
+                return false;
+            });
+            if(bad) {
+                await send_autodelete_message(message.channel, `Invalid usergroup name: ${name}`, 1000 * 30);
+                return;
+            }
+            const sent_message = (await api("POST", "chat.postMessage", {
+                token: config.token,
+                channel: message.channel,
+                text: messageText
+            })).message;
+            for(let i = 0;i < reactions.length;i ++) {
+                const reaction = reactions[i];
+                await api("POST", "reactions.add", {
+                    token: config.token,
+                    name: reaction.substring(1, reaction.length - 1),
+                    channel: message.channel,
+                    timestamp: sent_message.ts
+                });
+            }
+        } catch(e) {
+            console.log(e);
+            await send_autodelete_message(message.channel, `Invalid command format.`, 1000 * 30);
+        }
+    }
+})
 
 const api = async (method, endpoint, params) => {
     const url = "https://slack.com/api/" + endpoint;
     if(!params) params = {};
     let payload;   
     if(method ==  "GET") {
+    //     if(endpoint == "usergroups.list") {
+    //         payload = {
+    //             data: params
+    //         }
+    //     } else {
+            payload = {
+                params: params
+            }
+        // }
+    } else {
         payload = {
             params: params
         }
-    } else {
-        payload = {
-            data: params
-        }
     }
+    console.log(endpoint);
     const resp = await axios({
         method: method,
         url: url,
         ...payload
     });
-    //console.log(endpoint);
-    //console.log(resp.data);
+    console.log(resp.data);
     return resp.data;
+}
+
+const send_autodelete_message = async (channel, text, timeout) => {
+    const message = (await api("POST", "chat.postMessage", {
+        token: config.token,
+        channel: channel,
+        text: text
+    })).message;
+    setTimeout(() => {
+        api("POST", "chat.delete", {
+            token: config.token,
+            channel: channel,
+            ts: message.ts
+        })
+    }, timeout);
 }
 
 const oauth_redirect = () => {
@@ -63,7 +138,7 @@ const get_oauth_code = async () => {
             }
             resolve(url.query["code"]);
             res.writeHead(200, {"Content-Type": "text/plain"});
-            res.end();
+            res.end("Successfully authoirzed. You may now close this page.");
             server.close();
         }).listen(8000);
     });
@@ -78,12 +153,18 @@ const exchange_oauth_code = async (code) => {
     })).access_token;
 }
 
-(async function() {
-    const code = await get_oauth_code();
-    console.log(code);
-    const token = await exchange_oauth_code(code);
-    console.log(token);
-    console.log(await api("GET", "usergroups.list", {
+const fetch_user_groups = async (token) => {
+    return await api("GET", "usergroups.list", {
         token: token
-    }));
-})();
+    });
+}
+
+// (async function() {
+//     const code = await get_oauth_code();
+//     console.log(code);
+//     const token = await exchange_oauth_code(code);
+//     console.log(token);
+//     console.log(await api("GET", "usergroups.list", {
+//         token: token
+//     }));
+// })();
