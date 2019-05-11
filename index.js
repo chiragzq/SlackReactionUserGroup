@@ -11,10 +11,13 @@ const bot = new SlackBot({
 });
 
 let token;
-let usergroups;
 let names;
+let usergroups;
 let ids;
 let resolve;
+
+let messages = {};
+
 
 bot.on("start", async () => {
     console.log("Bot is now running");
@@ -41,6 +44,7 @@ bot.on("message", async (message) => {
             let messageText = "*React to get roles associated with your subteam:*";
             let reactions = [];
             let bad = false;
+            const reactNameMap = {};
             tokens.some((token) => {
                 const name = token.split("%")[0];
                 const react = token.split("%")[1];
@@ -52,6 +56,7 @@ bot.on("message", async (message) => {
                 }
                 messageText += `\n${name}: ${react}`
                 reactions.push(react);
+                reactNameMap[react.substring(1, react.length - 1)] = name;
                 return false;
             });
             if(bad) {
@@ -72,6 +77,13 @@ bot.on("message", async (message) => {
                     timestamp: sent_message.ts
                 });
             }
+            messages[sent_message.ts] = {
+                usergroups: usergroups,
+                ids: ids,
+                names: names,
+                reactNameMap: reactNameMap
+            }
+
         } catch(e) {
             console.log(e);
             await send_autodelete_message(message.channel, `Invalid command format.`, 1000 * 30);
@@ -148,6 +160,21 @@ const fetch_user_groups = async (token) => {
     });
 }
 
+const get_users_in_usergroup = async (token, usergroup) => {
+    return await api("GET", "usergroups.users.list", {
+        token: token,
+        usergroup: usergroup
+    }).users;
+}
+
+const update_usergroup = async (token, it, users) => {
+    api("POST", "usergroups.users.update", {
+        token: token,
+        usergroup: usergroup,
+        users: users.join(",")
+    })
+}
+
 http.createServer((req, res) => {
     const url = urllib.parse(req.url, true);
     if(url.pathname == "/") {
@@ -160,7 +187,19 @@ http.createServer((req, res) => {
         req.on("end", () => {
             const data = JSON.parse(body);
             res.writeHead(200, {"Content-Type": "text/plain"});
-            res.end(data["challenge"]);
+            res.end("Thanks!");
+
+            if(data.event.type == "reaction_added") {
+                if(!messages[data.event.item.ts]) return;
+                const info = messages[data.event.item.ts];
+                const userGroupId = ids[names.indexOf(info.reactNameMap[data.event.reaction])];
+                const users = await get_users_in_usergroup(token, userGroupId);
+                if(users.indexOf(data.event.user) >= 0) {
+                    users.push(data.event.user);
+                    update_usergroup(token, id, users);
+                }
+            }
+            
         });
     }
     else if(url.pathname == "/oauth" && resolve) {
