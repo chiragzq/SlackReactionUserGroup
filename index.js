@@ -162,10 +162,10 @@ const fetch_user_groups = async (token) => {
 }
 
 const get_users_in_usergroup = async (token, usergroup) => {
-    return await api("GET", "usergroups.users.list", {
+    return await (api("GET", "usergroups.users.list", {
         token: token,
         usergroup: usergroup
-    }).users;
+    })).users;
 }
 
 const update_usergroup = async (token, id, users) => {
@@ -191,7 +191,7 @@ http.createServer(async (req, res) => {
     else if(url.pathname == "/event" && req.method == "POST") { 
         let body = "";
         req.on("data", chunk => {body += chunk.toString()});
-        req.on("end", () => {
+        req.on("end", async () => {
             const data = JSON.parse(body);
             res.writeHead(200, {"Content-Type": "text/plain"});
             res.end("Thanks!");
