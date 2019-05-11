@@ -162,7 +162,7 @@ const fetch_user_groups = async (token) => {
 }
 
 const get_users_in_usergroup = async (token, usergroup) => {
-    return await (api("GET", "usergroups.users.list", {
+    return (await api("GET", "usergroups.users.list", {
         token: token,
         usergroup: usergroup
     })).users;
