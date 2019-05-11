@@ -91,20 +91,21 @@ bot.on("message", async (message) => {
     }
 })
 
+/**
+ * Sends a request to the slack API and retrieves the result/error
+ * @param {string} method the http request method (e.g. GET, POST)
+ * @param {string} endpoint the api method to call (e.g. user.info)
+ * @param {object} params the parameters to send to the server. they will automatically be sent as 
+ *                        url parameters or in the post body depending on the request type
+ */
 const api = async (method, endpoint, params) => {
     const url = "https://slack.com/api/" + endpoint;
     if(!params) params = {};
     let payload;   
     if(method ==  "GET") {
-    //     if(endpoint == "usergroups.list") {
-    //         payload = {
-    //             data: params
-    //         }
-    //     } else {
-            payload = {
-                params: params
-            }
-        // }
+        payload = {
+            params: params
+        }
     } else {
         payload = {
             params: params
@@ -167,15 +168,21 @@ const get_users_in_usergroup = async (token, usergroup) => {
     }).users;
 }
 
-const update_usergroup = async (token, it, users) => {
-    api("POST", "usergroups.users.update", {
+const update_usergroup = async (token, id, users) => {
+   api("POST", "usergroups.users.update", {
         token: token,
-        usergroup: usergroup,
+        usergroup: id,
         users: users.join(",")
     })
 }
 
-http.createServer((req, res) => {
+/**
+ * The serve accomplishes 3 tasks at once:
+ * 1) keep the glitch process alive by exposing an endpoint and pinging it
+ * 2) listen for oauth authorizations to obtain user codes
+ * 3) listen for reaction events and adjust user groups
+ */
+http.createServer(async (req, res) => {
     const url = urllib.parse(req.url, true);
     if(url.pathname == "/") {
         res.writeHead(200, {"Content-Type": "text/plain"});
@@ -188,30 +195,40 @@ http.createServer((req, res) => {
             const data = JSON.parse(body);
             res.writeHead(200, {"Content-Type": "text/plain"});
             res.end("Thanks!");
-
+            if(data.event.user == config.bot_id) return;
             if(data.event.type == "reaction_added") {
                 if(!messages[data.event.item.ts]) return;
                 const info = messages[data.event.item.ts];
                 const userGroupId = ids[names.indexOf(info.reactNameMap[data.event.reaction])];
                 const users = await get_users_in_usergroup(token, userGroupId);
-                if(users.indexOf(data.event.user) >= 0) {
+                if(users.indexOf(data.event.user) == -1) {
                     users.push(data.event.user);
-                    update_usergroup(token, id, users);
+                    update_usergroup(token, userGroupId, users);
                 }
             }
-            
+            else if(data.event.type == "reaction_removed") {
+                if(!messages[data.event.item.ts]) return;
+                const info = messages[data.event.item.ts];
+                const userGroupId = ids[names.indexOf(info.reactNameMap[data.event.reaction])];
+                const users = await get_users_in_usergroup(token, userGroupId);
+                if(users.indexOf(data.event.user) >= 0) {
+                    users.splice(users.indexOf(data.event.user), 1);
+                    update_usergroup(token, userGroupId, users);
+                }
+            }
         });
     }
     else if(url.pathname == "/oauth" && resolve) {
         resolve(url.query["code"]);
         resolve = undefined;
         res.writeHead(200, {"Content-Type": "text/plain"});
-        res.end("Successfully authoirzed. You may now close this page.");
+        res.end("Successfully authorized. You may now close this page.");
     } else {
         res.writeHead(404, {"Content-Type": "text/plain"});
         res.end("Not found");
     }
 }).listen(process.env.PORT || 8000);
+
 
 // (async function() {
 //     const code = await get_oauth_code();
