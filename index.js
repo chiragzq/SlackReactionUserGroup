@@ -60,7 +60,7 @@ bot.on("message", async (message) => {
                 return false;
             });
             if(bad) {
-                await send_autodelete_message(message.channel, `Invalid usergroup name: ${name}`, 1000 * 30);
+                await send_autodelete_message(message.channel, `Invalid usergroup name:`, 1000 * 30);
                 return;
             }
             const sent_message = (await api("POST", "chat.postMessage", {
