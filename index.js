@@ -194,6 +194,9 @@ http.createServer(async (req, res) => {
         req.on("end", async () => {
             const data = JSON.parse(body);
             res.writeHead(200, {"Content-Type": "text/plain"});
+            if(data.event.type == "url_verification") {
+                res.end(data.challenge);
+            }
             res.end("Thanks!");
             if(data.event.user == config.bot_id) return;
             if(data.event.type == "reaction_added") {
